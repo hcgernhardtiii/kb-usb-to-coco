@@ -1,0 +1,9 @@
+  h:120.0mm  
+  w:295.0mm
+  d: 13.5mm
+lip:  3.0mm
+hwd: 14.0mm
+hdp: 12.0mm
+stw:  5.0mm
+std:  5.0mm
+btl: 46.0mm

@@ -1,0 +1,4 @@
+(fp_lib_table
+  (version 7)
+  (lib (name "edge-pads")(type "KiCad")(uri "${KIPRJMOD}/edge-pads.pretty")(options "")(descr ""))
+)

@@ -1,0 +1,5 @@
+(sym_lib_table
+  (version 7)
+  (lib (name "MCU_RaspberryPi_and_Boards")(type "KiCad")(uri "/home/henry/.local/src/KiCad-RP-Pico/RP-Pico Libraries/MCU_RaspberryPi_and_Boards.kicad_sym")(options "")(descr ""))
+  (lib (name "MT_8808_8816")(type "KiCad")(uri "${KIPRJMOD}/MT_8808_8816.kicad_sym")(options "")(descr ""))
+)

@@ -1,0 +1,11 @@
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-F_Cu.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-B_Cu.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-F_Paste.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-B_Paste.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-F_Silkscreen.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-B_Silkscreen.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-F_Mask.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-B_Mask.gbr'.
+Plotted to '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-Edge_Cuts.gbr'.
+Created Gerber job file '/home/henry/._places/coco-hardware/kb-usb-to-coco/kb-usb-to-coco-pcb/kb-usb-to-coco/fab-files/kb-usb-to-coco-job.gbrjob'.
+Info: Done.

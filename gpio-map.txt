@@ -1,0 +1,10 @@
+GPIO  Pico  Signal  MT8808
+  2     4   RESET     10
+  3     5   STROBE     2
+  4     6   DATA       4
+  5     7   AX0       24
+  6     9   AX1       25
+  7    10   AX2       26
+  8    11   AY0       27
+  9    12   AY1       28
+ 10    14   AY2        1

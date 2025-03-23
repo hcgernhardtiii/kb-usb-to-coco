@@ -1,0 +1,13 @@
+"Id";"Designator";"Footprint";"Quantity";"Designation";"Supplier and ref";
+1;"LOGO";"tbk-logo";1;"tbk-logo";;;
+2;"U2";"DIP-8_W7.62mm_Socket_LongPads";1;"6N137";;;
+3;"U1";"RPi_Pico_SMD_TH";1;"Pico";;;
+4;"R19";"R_Axial_DIN0207_L6.3mm_D2.5mm_P7.62mm_Horizontal";1;"330";;;
+5;"R18,R17,R16,R15,R14,R13,R12,R11,R10,R9,R8,R7,R6,R5,R4,R3,R2,R1";"R_0603_1608Metric";18;"10K";;;
+6;"Q2,Q1,Q5,Q3,Q4,Q6,Q7,Q8,Q9";"SOT-23";9;"BSS138";;;
+7;"J4";"PinHeader_1x02_P2.54mm_Vertical";1;"Power";;;
+8;"J3";"PinHeader_1x16_P2.54mm_Vertical";1;"CoCo KB";;;
+9;"J2";"PinHeader_1x03_P2.54mm_Vertical";1;"UART_{OUT}";;;
+10;"J1";"PinHeader_1x04_P2.54mm_Vertical";1;"I2C";;;
+11;"C2,C1";"C_Disc_D6.0mm_W2.5mm_P5.00mm";2;".1µF";;;
+12;"U3";"DIP-28_W15.24mm_Socket_LongPads";1;"MT8808";;;
