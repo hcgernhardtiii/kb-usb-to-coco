@@ -1,0 +1,3 @@
+[submodule "tinyusb-test/build/pico-sdk/tinyusb"]
+	path = tinyusb-test/build/pico-sdk/tinyusb
+	url = https://github.com/hathach/tinyusb
