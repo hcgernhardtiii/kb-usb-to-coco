@@ -1,129 +1,16 @@
-#include <stdio.h>
-#include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "bsp/board_api.h"
-#include "tusb.h"
-
-#define USE_ANSI_ESCAPE   0
-#define MAX_REPORT  4
-
-// Call counters
-static uint8_t pcount=0;
-static uint8_t ccount=0;
-// The previous keyboard poll values
-static uint8_t prev_poll[7] = {0,0,0,0,0,0,0};
-// The current keyboard poll values
-static uint8_t cur_poll[7] = {0,0,0,0,0,0,0};
-
-static uint8_t raw_matrix [7][8] = {{
-	HID_KEY_BRACKET_LEFT,
-	HID_KEY_A,
-	HID_KEY_B,
-	HID_KEY_C,
-	HID_KEY_D,
-	HID_KEY_E,
-	HID_KEY_F,
-	HID_KEY_G
-},{
-	HID_KEY_H,
-	HID_KEY_I,
-	HID_KEY_J,
-	HID_KEY_K,
-	HID_KEY_L,
-	HID_KEY_M,
-	HID_KEY_N,
-	HID_KEY_O
-},{
-	HID_KEY_P,
-	HID_KEY_Q,
-	HID_KEY_R,
-	HID_KEY_S,
-	HID_KEY_T,
-	HID_KEY_U,
-	HID_KEY_V,
-	HID_KEY_W
-},{
-	HID_KEY_X,
-	HID_KEY_Y,
-	HID_KEY_Z,
-	HID_KEY_ARROW_UP,
-	HID_KEY_ARROW_DOWN,
-	HID_KEY_ARROW_LEFT,
-	HID_KEY_ARROW_RIGHT,
-	HID_KEY_SPACE
-},{
-	HID_KEY_0,
-	HID_KEY_1,
-	HID_KEY_2,
-	HID_KEY_3,
-	HID_KEY_4,
-	HID_KEY_5,
-	HID_KEY_6,
-	HID_KEY_7
-},{
-	HID_KEY_8,
-	HID_KEY_9,
-	HID_KEY_MINUS,
-	HID_KEY_SEMICOLON,
-	HID_KEY_COMMA,
-	HID_KEY_EQUAL,
-	HID_KEY_PERIOD,
-	HID_KEY_SLASH
-},{
-	HID_KEY_ENTER,
-	HID_KEY_HOME,
-	HID_KEY_ESCAPE,
-	HID_KEY_NONE,	// Will be alt
-	HID_KEY_NONE,	// Will be ctrl
-	HID_KEY_F1,
-	HID_KEY_F2,
-	HID_KEY_NONE	// Will be shift (either)
-}};
-static uint8_t matrix_row_of[256];
-static uint8_t matrix_col_of[256];
-
-static struct {
-  uint8_t report_count;
-  tuh_hid_report_info_t report_info[MAX_REPORT];
-} hid_info[CFG_TUH_HID];
-
-static bool screen_is_dirty = false;
-
-void led_blinking_task (void);
-static void process_kbd_report(hid_keyboard_report_t const *report);
-static void cls();
-static void putblock (int row, int col);
-static void clrblock (int row, int col);
-
-#define MT_RESET_GPIO 2
-#define MT_STROBE_GPIO 3
-
-#define MT_RESET 0x004
-#define MT_STROBE 0x008
-#define MT_DATA 0x010
-#define MT_ADDR 0x7E0
-
-#define MT_RESET_SHIFT 2
-#define MT_STROBE_SHIFT 3
-#define MT_DATA_SHIFT 4
-#define MT_ROW_SHIFT 5
-#define MT_COL_SHIFT 8
-
-#define MT_HOLD_T() asm volatile ("nop\n\tnop");
-#define MT_STROBE_T() MT_HOLD_T() MT_HOLD_T()
-#define MT_RESET_T() MT_STROBE_T() MT_STROBE_T()
-#define MT_WAIT_T() MT_RESET_T() MT_RESET_T()
+#include "kb-usb-to-coco-firmware.h"
 
 int main()
 {
+	// initialize stdio, the board itself, and tinyUSB host
     stdio_init_all();
 	board_init();
 	tuh_init(BOARD_TUH_RHPORT);
 	if (board_init_after_tusb) {
 		board_init_after_tusb();
 	}
+	// Our optoisolator inverts the data signal
 	gpio_set_outover (0, GPIO_OVERRIDE_INVERT);
-
 
 	// Initialize GPIOs
 	printf ("Initializing GPIOs\n");
@@ -131,25 +18,28 @@ int main()
 	gpio_set_dir_out_masked (MT_RESET | MT_STROBE | MT_DATA | MT_ADDR);
 	gpio_clr_mask (MT_RESET | MT_STROBE | MT_DATA | MT_ADDR);
 
-	// Initialize the matrix row and column lookup tables
+	// Initialize the raw matrix row and column lookup tables
 	int i, j;
 	printf ("Initializing lookups…\n");
 	for (i = 0; i < 256; i++) {
-		matrix_row_of[i] = 255;
-		matrix_col_of[i] = 255;
+		raw_matrix_row_of[i] = 255;
+		raw_matrix_col_of[i] = 255;
 	}
-	matrix_row_of[HID_KEY_BACKSPACE] = 3;
-	matrix_col_of[HID_KEY_BACKSPACE] = 5;
+	raw_matrix_row_of[HID_KEY_BACKSPACE] = 3;
+	raw_matrix_col_of[HID_KEY_BACKSPACE] = 5;
 	printf ("Populating lookups…\n");
 	for (i = 0; i < 7; i++) {
 		for (j = 0; j < 8; j++) {
-			matrix_row_of [raw_matrix[i][j]] = i;
-			matrix_col_of [raw_matrix[i][j]] = j;
+			raw_matrix_row_of [raw_matrix[i][j]] = i;
+			raw_matrix_col_of [raw_matrix[i][j]] = j;
 		}
 	}
+
+	// Start up the serial display
 	screen_is_dirty = true;
 	printf ("Waiting for reports…\n");
 
+	// Start the poll 
     while (true) {
 		tuh_task();
 		led_blinking_task();
@@ -176,7 +66,7 @@ void tuh_mount_cb (uint8_t dev_addr) {
 	screen_is_dirty = true;
 	printf("A device with address %d is mounted\r\n", dev_addr);
 }
-void tun_umount_cb (uint8_t dev_addr) {
+void tuh_umount_cb (uint8_t dev_addr) {
 	screen_is_dirty = true;
 	printf("A device with address %d is unmounted\r\n", dev_addr);
 }
