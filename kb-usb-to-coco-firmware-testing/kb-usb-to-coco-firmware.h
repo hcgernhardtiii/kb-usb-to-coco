@@ -26,6 +26,16 @@ static struct {
 
 static bool screen_is_dirty = false;
 
+// Some mode flags we'll need:
+// - <kbd>GUI</kbd> is our special function key.  If it's pressed we're talking
+//   to the interface, not to the CoCo.
+static bool gui_is_pressed = false;
+// - Whether or not we're in mapped mode (we start in raw mode)
+static bool mapped_mode_active = false;
+// - Whether or not we're recording a macro (macro keys will be dealt with in
+//   `process_kbd_report()`)
+static bool recording_macro = false;
+
 void led_blinking_task (void);
 static void process_kbd_report(hid_keyboard_report_t const *report);
 static void cls();
