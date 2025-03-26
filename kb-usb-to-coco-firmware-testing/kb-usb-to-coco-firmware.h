@@ -42,4 +42,11 @@ static void cls();
 static void putblock (int row, int col);
 static void clrblock (int row, int col);
 
+// Visualize the “big” matrix—the raw keyboard scan itself
+static void visualize_bigm (
+	uint16_t cur[16],
+	uint16_t presses[16],
+	uint16_t releases[16]
+);
+
 #endif

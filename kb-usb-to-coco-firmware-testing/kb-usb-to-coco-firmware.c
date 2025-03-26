@@ -134,56 +134,89 @@ void tuh_hid_report_received_cb(
 }
 
 static void process_kbd_report (hid_keyboard_report_t const* report) {
-	uint8_t i, j, press, release;
-	uint8_t keycode;
-	uint32_t pins;
-	if (screen_is_dirty) cls();
+	static uint16_t prev_report[16];
+	static uint16_t cur_report[16];
+	static uint16_t presses[16];
+	static uint16_t releases[16];
+	uint8_t i, j, keycode;
 
-	// Rotate the keypress data
-	for (i = 0; i < 7; i++) {
-		prev_poll[i] = cur_poll[i];	
-		cur_poll[i] = 0;
+	// Rotate the report key data
+	for (i = 0; i < 16; i++) {
+		prev_report[i] = cur_report[i];	
+		cur_report[i] = 0;
 	}
-	// If we have a GUI key pressed, we'll be doing other processing later on
-	if (!!(report->modifier & 0x88)) {
-		// Do GUI key processing here
-		return;
+	// Matrixify the modifier keys.  Blessedly, this maps directly to the
+	//   HID keycodes, and they are the only keycodes at row 0xe
+	if (!!(report->modifier)) {
+		cur_report[0xe] = (uint16_t)report->modifier & 0x0f;
 	}
-	cls();
-	// Handle the modifier keys
-	if (!!(report->modifier & 0x44)) {
-		// Alt
-		cur_poll[6] |= 0x08;
-	}
-	if (!!(report->modifier & 0x22)) {
-		// Shift
-		cur_poll[6] |= 0x80;
-	}
-	if (!!(report->modifier & 0x11)) {
-		// Ctrl
-		cur_poll[6] |= 0x10;
-	}
-	// Handle all the other keys
+	// Walk through the key reports and place them in the matrix.  The row is
+	//   the high nybble of the keycode.
 	for (i = 0; i < 6; i++) {
-		if ((keycode = report->keycode[i]) && matrix_row_of[keycode] < 7) {
-			cur_poll[matrix_row_of[keycode]] |= (1 << matrix_col_of[keycode]);
+		if (!!(keycode = report->keycode[i])) {
+			cur_report[(keycode & 0xf0) >> 4] |= 1 << (keycode & 0x0f);
 		}
 	}
-	// Calculate the key state changes
-	for (i = 0; i < 7; i++) {
-		release = prev_poll[i] & (~cur_poll[i]);
-		press = (~prev_poll[i]) & cur_poll[i];
-		printf (
-			"\e[%d;1f%d v:%02x c:%02x p:%02x r:%02x",
-			i+10, i, prev_poll[i], cur_poll[i], press, release
-		);
-		if (!!release) for (j = 0; j < 8; j++) {
-			if (!!((release >> j) & 1)) clrblock (i, j);
-		}
-		if (!!press) for (j = 0; j < 8; j++) {
-			if (!!((press >> j) & 1)) putblock (i, j);
-		}
+	// Walk through the matrixed reports and calculate the presses and releases.
+	for (i = 0; i < 15; i++) {
+		releases[i] = prev_report[i] & (~cur_report[i]);
+		presses[i] = (~prev_report[i]) & cur_report[i];
 	}
+	if (!!(presses[0xe] & 0x88)) gui_is_pressed = true;
+	if (!!(releases[0xe] & 0x88)) gui_is_pressed = false;
+
+	visualize_bigm (cur_report, presses, releases);
+
+	// uint8_t i, j, press, release;
+	// uint8_t keycode;
+	// uint32_t pins;
+	// if (screen_is_dirty) cls();
+
+	// // Rotate the keypress data
+	// for (i = 0; i < 7; i++) {
+	// 	prev_poll[i] = cur_poll[i];	
+	// 	cur_poll[i] = 0;
+	// }
+	// // If we have a GUI key pressed, we'll be doing other processing later on
+	// if (!!(report->modifier & 0x88)) {
+	// 	// Do GUI key processing here
+	// 	return;
+	// }
+	// cls();
+	// // Handle the modifier keys
+	// if (!!(report->modifier & 0x44)) {
+	// 	// Alt
+	// 	cur_poll[6] |= 0x08;
+	// }
+	// if (!!(report->modifier & 0x22)) {
+	// 	// Shift
+	// 	cur_poll[6] |= 0x80;
+	// }
+	// if (!!(report->modifier & 0x11)) {
+	// 	// Ctrl
+	// 	cur_poll[6] |= 0x10;
+	// }
+	// // Handle all the other keys
+	// for (i = 0; i < 6; i++) {
+	// 	if ((keycode = report->keycode[i]) && matrix_row_of[keycode] < 7) {
+	// 		cur_poll[matrix_row_of[keycode]] |= (1 << matrix_col_of[keycode]);
+	// 	}
+	// }
+	// // Calculate the key state changes
+	// for (i = 0; i < 7; i++) {
+	// 	release = prev_poll[i] & (~cur_poll[i]);
+	// 	press = (~prev_poll[i]) & cur_poll[i];
+	// 	printf (
+	// 		"\e[%d;1f%d v:%02x c:%02x p:%02x r:%02x",
+	// 		i+10, i, prev_poll[i], cur_poll[i], press, release
+	// 	);
+	// 	if (!!release) for (j = 0; j < 8; j++) {
+	// 		if (!!((release >> j) & 1)) clrblock (i, j);
+	// 	}
+	// 	if (!!press) for (j = 0; j < 8; j++) {
+	// 		if (!!((press >> j) & 1)) putblock (i, j);
+	// 	}
+	// }
 }
 
 static void putblock (int row, int col) {
@@ -247,4 +280,38 @@ static void cls() {
 
 	printf ("\e[H\e[J 01234567\n0\n1\n2\n3\n4\n5\n6\e[24;1f");
 	screen_is_dirty = false;
+}
+
+static void visualize_bigm (
+	uint16_t cur[16],
+	uint16_t presses[16],
+	uint16_t releases[16]
+) {
+	static bool do_setup = true;
+	if (do_setup) {
+		printf (
+			"\e[H\e[J     CURRENT          PRESSED          RELEASED\n 0123456789ABCDEF 0123456789ABCDEF 0123456789ABCDEF\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\nA\nB\nC\nD\nE\nF\e[24;1f"
+		);
+		do_setup = false;
+	}
+	for (int row = 0; row < 16; row++) for (int col = 0; col < 16; col++) {
+		// the current report
+		printf (
+			"\e[%d;%df%s",
+			row+3, col+2,
+			!!(cur[row] & (1 << col)) ? "▒" : " "
+		);
+		// the presses for this report
+		printf (
+			"\e[%d;%df%s",
+			row+3, col+2+17,
+			!!(presses[row] & (1 << col)) ? "▒" : " "
+		);
+		// the releases for this report
+		printf (
+			"\e[%d;%df%s",
+			row+3, col+2+17+17,
+			!!(releases[row] & (1 << col)) ? "▒" : " "
+		);
+	}
 }
