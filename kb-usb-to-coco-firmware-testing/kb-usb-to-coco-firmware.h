@@ -11,14 +11,6 @@
 
 #define MAX_REPORT  4
 
-// Call counters
-static uint8_t pcount=0;
-static uint8_t ccount=0;
-// The previous keyboard poll values
-static uint8_t prev_poll[7] = {0,0,0,0,0,0,0};
-// The current keyboard poll values
-static uint8_t cur_poll[7] = {0,0,0,0,0,0,0};
-
 static struct {
   uint8_t report_count;
   tuh_hid_report_info_t report_info[MAX_REPORT];
@@ -41,6 +33,11 @@ static void process_kbd_report(hid_keyboard_report_t const *report);
 static void cls();
 static void putblock (int row, int col);
 static void clrblock (int row, int col);
+
+// process the matrix in raw mode
+static void raw_mode (hid_keyboard_report_t const *report);
+// process the matrix in mapped mode
+static void mapped_mode (hid_keyboard_report_t const *report);
 
 // Visualize the “big” matrix—the raw keyboard scan itself
 static void visualize_bigm (

@@ -162,124 +162,123 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 		releases[i] = prev_report[i] & (~cur_report[i]);
 		presses[i] = (~prev_report[i]) & cur_report[i];
 	}
-	if (!!(presses[0xe] & 0x88)) gui_is_pressed = true;
-	if (!!(releases[0xe] & 0x88)) gui_is_pressed = false;
+	if (!!(presses[0xe] & 0x88)) {
+		gui_is_pressed = true;
+		printf ("GUI key is pressed");
+	}
+	if (!!(releases[0xe] & 0x88)) {
+		printf ("GUI key is released");
+		gui_is_pressed = false;
+	}
 
-	visualize_bigm (cur_report, presses, releases);
+	if (gui_is_pressed) {
+		// do GUI key stuff here
+		return;
+	}
+	if (recording_macro) {
+		// call the macro key add here
+	}
+	// check for macro playback keypress here (macro should record raw/mapped
+	//   state)
+	if (mapped_mode_active) {
+		mapped_mode (report);
+	} else {
+		raw_mode (report);
+	}
 
-	// uint8_t i, j, press, release;
-	// uint8_t keycode;
-	// uint32_t pins;
-	// if (screen_is_dirty) cls();
 
-	// // Rotate the keypress data
-	// for (i = 0; i < 7; i++) {
-	// 	prev_poll[i] = cur_poll[i];	
-	// 	cur_poll[i] = 0;
-	// }
-	// // If we have a GUI key pressed, we'll be doing other processing later on
-	// if (!!(report->modifier & 0x88)) {
-	// 	// Do GUI key processing here
-	// 	return;
-	// }
-	// cls();
-	// // Handle the modifier keys
-	// if (!!(report->modifier & 0x44)) {
-	// 	// Alt
-	// 	cur_poll[6] |= 0x08;
-	// }
-	// if (!!(report->modifier & 0x22)) {
-	// 	// Shift
-	// 	cur_poll[6] |= 0x80;
-	// }
-	// if (!!(report->modifier & 0x11)) {
-	// 	// Ctrl
-	// 	cur_poll[6] |= 0x10;
-	// }
-	// // Handle all the other keys
-	// for (i = 0; i < 6; i++) {
-	// 	if ((keycode = report->keycode[i]) && matrix_row_of[keycode] < 7) {
-	// 		cur_poll[matrix_row_of[keycode]] |= (1 << matrix_col_of[keycode]);
-	// 	}
-	// }
-	// // Calculate the key state changes
-	// for (i = 0; i < 7; i++) {
-	// 	release = prev_poll[i] & (~cur_poll[i]);
-	// 	press = (~prev_poll[i]) & cur_poll[i];
-	// 	printf (
-	// 		"\e[%d;1f%d v:%02x c:%02x p:%02x r:%02x",
-	// 		i+10, i, prev_poll[i], cur_poll[i], press, release
-	// 	);
-	// 	if (!!release) for (j = 0; j < 8; j++) {
-	// 		if (!!((release >> j) & 1)) clrblock (i, j);
-	// 	}
-	// 	if (!!press) for (j = 0; j < 8; j++) {
-	// 		if (!!((press >> j) & 1)) putblock (i, j);
-	// 	}
-	// }
+	// visualize_bigm (cur_report, presses, releases);
 }
 
-static void putblock (int row, int col) {
-	ccount = 0;
-	pcount++;
-	uint32_t pins =
-		(uint32_t)row << MT_ROW_SHIFT |
-		(uint32_t)col << MT_COL_SHIFT |
-		1 << MT_DATA_SHIFT;
-	row += 2; col += 2;
-	printf ("\e[%d;%df▒", row, col);
-
-	// Set up the data and address
-	gpio_put_masked (
-		MT_DATA | MT_ADDR,
-		pins
+static void raw_mode (hid_keyboard_report_t const* report) {
+	printf (
+		"Report received in raw mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
+		report->keycode[0],
+		report->keycode[1],
+		report->keycode[2],
+		report->keycode[3],
+		report->keycode[4],
+		report->keycode[5],
+		report->keycode[6],
+		report->modifier
 	);
-	MT_HOLD_T();
-	// Strobe the data and address
-	gpio_put (MT_STROBE_GPIO, 1);
-	MT_STROBE_T();
-	gpio_put (MT_STROBE_GPIO, 0);
-	MT_HOLD_T();
-	// Release the data and address pins
-	gpio_clr_mask (MT_DATA | MT_ADDR);
-	MT_WAIT_T();
-	printf ("\e[24;1fp:%d c:%d", pcount, ccount);
-}
-static void clrblock (int row, int col) {
-	pcount=0;
-	ccount++;
-	uint32_t pins =
-		(uint32_t)row << MT_ROW_SHIFT |
-		(uint32_t)col << MT_COL_SHIFT ;
-	row += 2; col += 2;
-	printf ("\e[%d;%df ", row, col);
+	// The previous keyboard poll values
+	static uint8_t prev_poll[7] = {0,0,0,0,0,0,0};
+	// The current keyboard poll values
+	static uint8_t cur_poll[7] = {0,0,0,0,0,0,0};
+	uint8_t i, j, press, release;
+	uint8_t keycode;
+	uint32_t pins;
 
-	// Set up the data and address
-	gpio_put_masked (
-		MT_DATA | MT_ADDR,
-		pins
-	);
-	MT_HOLD_T();
-	// Strobe the data and address
-	gpio_put (MT_STROBE_GPIO, 1);
-	MT_STROBE_T();
-	gpio_put (MT_STROBE_GPIO, 0);
-	MT_HOLD_T();
-	// Release the data and address pins
-	gpio_clr_mask (MT_DATA | MT_ADDR);
-	MT_WAIT_T();
-	printf ("\e[24;1fp:%d c:%d", pcount, ccount);
-}
-
-static void cls() {
-	// // Run the reset
-	// gpio_put (MT_RESET_GPIO, 1);
-	// MT_RESET_T();
-	// gpio_put (MT_RESET_GPIO, 0);
-	// MT_WAIT_T();
-
-	printf ("\e[H\e[J 01234567\n0\n1\n2\n3\n4\n5\n6\e[24;1f");
-	screen_is_dirty = false;
+	// Rotate the keypress data
+	for (i = 0; i < 7; i++) {
+		prev_poll[i] = cur_poll[i];	
+		cur_poll[i] = 0;
+	}
+	// Handle the modifier keys
+	if (!!(report->modifier & 0x44)) {
+		// Alt
+		cur_poll[6] |= 0x08;
+	}
+	if (!!(report->modifier & 0x22)) {
+		// Shift
+		cur_poll[6] |= 0x80;
+	}
+	if (!!(report->modifier & 0x11)) {
+		// Ctrl
+		cur_poll[6] |= 0x10;
+	}
+	// Handle all the other keys
+	for (i = 0; i < 6; i++) {
+		if ((keycode = report->keycode[i]) && raw_matrix_row_of[keycode] < 7) {
+			cur_poll[raw_matrix_row_of[keycode]] |=
+				(1 << raw_matrix_col_of[keycode]);
+		}
+	}
+	// Calculate the key state changes
+	for (i = 0; i < 7; i++) {
+		release = prev_poll[i] & (~cur_poll[i]);
+		press = (~prev_poll[i]) & cur_poll[i];
+		if (!!release) for (j = 0; j < 8; j++) if (!!((release >> j) & 1)) {
+			pins =
+				(uint32_t)i << MT_ROW_SHIFT |
+				(uint32_t)j << MT_COL_SHIFT;
+				// Set up the data and address
+				gpio_put_masked (
+					MT_DATA | MT_ADDR,
+					pins
+				);
+				MT_HOLD_T();
+				// Strobe the data and address
+				gpio_put (MT_STROBE_GPIO, 1);
+				MT_STROBE_T();
+				gpio_put (MT_STROBE_GPIO, 0);
+				MT_HOLD_T();
+				// Release the data and address pins
+				gpio_clr_mask (MT_DATA | MT_ADDR);
+				MT_WAIT_T();
+		}
+		if (!!press) for (j = 0; j < 8; j++) if (!!((press >> j) & 1)) {
+			pins =
+				(uint32_t)i << MT_ROW_SHIFT |
+				(uint32_t)j << MT_COL_SHIFT |
+				1 << MT_DATA_SHIFT;
+				// Set up the data and address
+				gpio_put_masked (
+					MT_DATA | MT_ADDR,
+					pins
+				);
+				MT_HOLD_T();
+				// Strobe the data and address
+				gpio_put (MT_STROBE_GPIO, 1);
+				MT_STROBE_T();
+				gpio_put (MT_STROBE_GPIO, 0);
+				MT_HOLD_T();
+				// Release the data and address pins
+				gpio_clr_mask (MT_DATA | MT_ADDR);
+				MT_WAIT_T();
+		}
+	}
 }
 
 static void visualize_bigm (
@@ -314,4 +313,19 @@ static void visualize_bigm (
 			!!(releases[row] & (1 << col)) ? "▒" : " "
 		);
 	}
+}
+
+static void mapped_mode (hid_keyboard_report_t const *report) {
+	printf (
+		"Report received in mapped mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
+		report->keycode[0],
+		report->keycode[1],
+		report->keycode[2],
+		report->keycode[3],
+		report->keycode[4],
+		report->keycode[5],
+		report->keycode[6],
+		report->modifier
+	);
+	return;
 }
