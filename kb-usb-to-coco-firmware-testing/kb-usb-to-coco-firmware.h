@@ -66,6 +66,13 @@ static void mapped_mode (
 		mt8808_send ((row), (col), 0); \
 		mt8808_pause(); \
 	}
+// deliberately ignore a keypress.  We need this in order to deal with
+//   potentially wonky releases later.
+#define MAP_IGNORE(key, state) \
+	if (MATRIX_HAS (presses, (key))) { \
+		mapped_mode_key_states[(key)] = (state); \
+		MATRIX_CLEAR (presses, (key)); \
+	}
 
 // Send a single keyswitch matrix operation to the mt8808
 static inline void mt8808_send (int row, int col, int data);

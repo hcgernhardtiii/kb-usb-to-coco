@@ -264,8 +264,12 @@ static void mapped_mode (
 ) {
 	bool is_shifted = !!(report->modifier & 0x22);
 	if (is_shifted && (
-		!!presses[0x1] || !!presses[0x2] || !!presses[0x3] ||
-		!!presses[0x4] || !!presses[0x5] || !!presses[0x6]
+		MATRIX_HAS (presses, HID_KEY_2) ||
+		!!(presses[0x2] & 0x60f8) ||
+		!!(presses[0x3] & 0x0018) ||
+		!!MATRIX_HAS (presses, HID_KEY_ARROW_RIGHT) ||
+		!!(presses[0x5] & 0xfff6) ||
+		!!(presses[0x6] & 0x000f)
 	)) {
 		// First let's check for our shift toggle specials
 		if (
@@ -287,7 +291,7 @@ static void mapped_mode (
 			mt8808_send (6, 7, 1);
 		}
 		// Now we go through our other specials:
-		if (!!presses[0x2] || !!presses[0x3]) {
+		if (!!(presses[0x2] && 0x60f0)) {
 			// These are the keypresses we translate
 			// - `HID_KEY_7` for `&` 
 			MAP_PRESS (HID_KEY_7, 4, 6, 0x3);
@@ -295,13 +299,112 @@ static void mapped_mode (
 			MAP_CONFLICT (HID_KEY_SEMICOLON, 5, 2, 0x3);
 			MAP_PRESS (HID_KEY_8, 5, 2, 0x3);
 			// - `HID_KEY_9` for `(` 
-			MAP_PRESS (HID_KEY_9, 4, 2, 0x3);
+			MAP_PRESS (HID_KEY_9, 5, 1, 0x3);
 			// - `HID_KEY_0` for `)` 
-			MAP_PRESS (HID_KEY_0, 4, 2, 0x3);
+			MAP_PRESS (HID_KEY_0, 4, 0, 0x3);
+			// - `HID_KEY_MINUS` for `_` (renders as a left arrow)
+			MAP_PRESS (HID_KEY_MINUS, 5, 5, 0x3);
 			// - `HID_KEY_EQUAL` for `+`
-			MAP_PRESS (HID_KEY_EQUAL, 4, 2, 0x3);
+			MAP_PRESS (HID_KEY_EQUAL, 5, 3, 0x3);
+		}
+		if (MATRIX_HAS (presses, HID_KEY_APOSTROPHE)) {
 			// - `HID_KEY_APOSTROPHE` for `"`
-			MAP_PRESS (HID_KEY_APOSTROPHE, 4, 2, 0x3);
+			MAP_PRESS (HID_KEY_APOSTROPHE, 4, 7, 0x3);
+		}
+		// And now for the ones we ignore:
+		MAP_IGNORE (HID_KEY_ARROW_RIGHT, 0x03);
+		if (!!(presses[0x5] & 0xfff6)) {
+			MAP_IGNORE (HID_KEY_ARROW_DOWN, 0x03);
+			MAP_IGNORE (HID_KEY_ARROW_UP, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_DIVIDE, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_MULTIPLY, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_SUBTRACT, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_ADD, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_ENTER, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_1, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_2, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_3, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_4, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_5, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_6, 0x03);
+			MAP_IGNORE (HID_KEY_KEYPAD_7, 0x03);
+		}
+		if (!!(presses[0x6] & 0x000f)) {
+			MAP_IGNORE (HID_KEY_KEYPAD_8, 0X03)
+			MAP_IGNORE (HID_KEY_KEYPAD_9, 0X03)
+			MAP_IGNORE (HID_KEY_KEYPAD_0, 0X03)
+			MAP_IGNORE (HID_KEY_KEYPAD_DECIMAL, 0X03)
+		}
+	}
+	if (!is_shifted && (
+		!!(presses[0x2] & 0xe000) ||
+		!!(presses[0x3] & 0x0011) ||
+		!!(presses[0x5] & 0xfff0) ||
+		!!(presses[0x6] & 0x000f)
+	)) {
+		// First let's check for our shift toggle specials
+		if (
+			!!(presses[0x2] & 0xc000) ||
+			!!(presses[0x3] & 0x0011) ||
+			!!(presses[0x5] & 0x00a0)
+		) {
+			// These specials need to be unshifted
+			mt8808_pause();
+			mt8808_send (6, 7, 1);
+			// - `HID_KEY_EQUAL` for `=` (shifted)
+			MAP_PRESS (HID_KEY_EQUAL, 5, 5, 0x1);
+			// - `HID_KEY_BRACKET_LEFT` for `[` (shifted)(down arrow)
+			MAP_PRESS (HID_KEY_BRACKET_LEFT, 3, 4, 0x1);
+			// - `HID_KEY_BRACKET_RIGHT` for `]` (shifted)(right arrow)
+			MAP_PRESS (HID_KEY_BRACKET_RIGHT, 3, 6, 0x1);
+			// - `HID_KEY_APOSTROPHE` for `'` (shifted)
+			MAP_PRESS (HID_KEY_APOSTROPHE, 4, 7, 0x1);
+			// - `HID_KEY_KEYPAD_MULTIPLY` for `*` (shifted)
+			MAP_PRESS (HID_KEY_KEYPAD_MULTIPLY, 5, 2, 0x1);
+			// - `HID_KEY_KEYPAD_ADD` for `+` (shifted)
+			MAP_PRESS (HID_KEY_KEYPAD_ADD, 5, 3, 0x1);
+			mt8808_pause();
+			// Restore the shift state
+			mt8808_send (6, 7, 0);
+		}
+		// Now we go through our other specials:
+		if (MATRIX_HAS (presses, HID_KEY_MINUS)) {
+			// - `HID_KEY_MINUS` for `-`
+			MAP_CONFLICT (HID_KEY_EQUAL, 5, 5, 0x1);
+			MAP_PRESS (HID_KEY_MINUS, 5, 5, 0x1);
+		}
+		if (!!(presses[0x5] & 0xff50)) {
+			// - `HID_KEY_KEYPAD_DIVIDE` for `/`
+			MAP_PRESS (HID_KEY_KEYPAD_DIVIDE, 5, 7, 0x1)
+			// - `HID_KEY_KEYPAD_SUBTRACT` for `-`
+			MAP_CONFLICT (HID_KEY_EQUAL, 5, 5, 0x1);
+			MAP_PRESS (HID_KEY_KEYPAD_SUBTRACT, 5, 5, 0x1);
+			// - `HID_KEY_KEYPAD_ENTER` for <kbd>enter</kbd>
+			MAP_PRESS (HID_KEY_KEYPAD_ENTER, 6, 0, 0x1);
+			// - `HID_KEY_KEYPAD_1` for `1`
+			MAP_PRESS (HID_KEY_KEYPAD_1, 4, 1, 0x1);
+			// - `HID_KEY_KEYPAD_2` for `2`
+			MAP_PRESS (HID_KEY_KEYPAD_2, 4, 2, 0x1);
+			// - `HID_KEY_KEYPAD_3` for `3`
+			MAP_PRESS (HID_KEY_KEYPAD_3, 4, 3, 0x1);
+			// - `HID_KEY_KEYPAD_4` for `4`
+			MAP_PRESS (HID_KEY_KEYPAD_4, 4, 4, 0x1);
+			// - `HID_KEY_KEYPAD_5` for `5`
+			MAP_PRESS (HID_KEY_KEYPAD_5, 4, 5, 0x1);
+			// - `HID_KEY_KEYPAD_6` for `6`
+			MAP_PRESS (HID_KEY_KEYPAD_6, 4, 6, 0x1);
+			// - `HID_KEY_KEYPAD_7` for `7`
+			MAP_PRESS (HID_KEY_KEYPAD_7, 4, 7, 0x1);
+		}
+		if (!!(presses[0x6] & 0x000f)) {
+			// - `HID_KEY_KEYPAD_8` for `8`
+			MAP_PRESS (HID_KEY_KEYPAD_8, 5, 0, 0x1);
+			// - `HID_KEY_KEYPAD_9` for `9`
+			MAP_PRESS (HID_KEY_KEYPAD_9, 5, 1, 0x1);
+			// - `HID_KEY_KEYPAD_0` for `0`
+			MAP_PRESS (HID_KEY_KEYPAD_0, 4, 0, 0x1);
+			// - `HID_KEY_KEYPAD_DECIMAL` for `.`
+			MAP_PRESS (HID_KEY_KEYPAD_DECIMAL, 5, 6, 0x1);
 		}
 	}
 	macro_record_pause();
