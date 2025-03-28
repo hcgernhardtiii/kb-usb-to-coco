@@ -279,7 +279,7 @@ static void mapped_mode (
 			// - `HID_KEY_2` for `@`
 			MAP_PRESS (HID_KEY_2, 4, 2, 0x3);
 			// - `HID_KEY_6` for `^`
-			MAP_PRESS (HID_KEY_6, 4, 2, 0x3);
+			MAP_PRESS (HID_KEY_6, 4, 6, 0x3);
 			// - `HID_KEY_SEMICOLON` for `:`
 			MAP_PRESS (HID_KEY_SEMICOLON, 5, 2, 0x3);
 			mt8808_pause();
@@ -291,8 +291,9 @@ static void mapped_mode (
 			// These are the keypresses we translate
 			// - `HID_KEY_7` for `&` 
 			MAP_PRESS (HID_KEY_7, 4, 6, 0x3);
-			// - `HID_KEY_8` for `*` 
-			MAP_PRESS (HID_KEY_8, 4, 2, 0x3);
+			// - `HID_KEY_8` for `*` (conflicts with HID_KEY_SEMICOLON)
+			MAP_CONFLICT (HID_KEY_SEMICOLON, 5, 2, 0x3);
+			MAP_PRESS (HID_KEY_8, 5, 2, 0x3);
 			// - `HID_KEY_9` for `(` 
 			MAP_PRESS (HID_KEY_9, 4, 2, 0x3);
 			// - `HID_KEY_0` for `)` 

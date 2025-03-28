@@ -57,6 +57,15 @@ static void mapped_mode (
 		mapped_mode_key_states[(key)] = (state); \
 		MATRIX_CLEAR (presses, (key)); \
 	}
+// resolve a mapped key conflict.  We check to see if the conflicting key
+//   is currently pressed.  If it is, we send a key release and pause before
+//   continuing on with the press.
+#define MAP_CONFLICT(key, row, col, state) \
+	if (mapped_mode_key_states[(key)] == (state)) { \
+		mapped_mode_key_states[(key)] = 0; \
+		mt8808_send ((row), (col), 0); \
+		mt8808_pause(); \
+	}
 
 // Send a single keyswitch matrix operation to the mt8808
 static inline void mt8808_send (int row, int col, int data);
