@@ -164,15 +164,20 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 	}
 	if (!!(presses[0xe] & 0x88)) {
 		gui_is_pressed = true;
-		printf ("GUI key is pressed");
+		printf ("GUI key is pressed\n");
 	}
 	if (!!(releases[0xe] & 0x88)) {
-		printf ("GUI key is released");
+		printf ("GUI key is released\n");
 		gui_is_pressed = false;
 	}
 
 	if (gui_is_pressed) {
-		// do GUI key stuff here
+		// check for GUI-Z, which toggles the mapped mode
+		if (
+			!!((presses[(HID_KEY_Z & 0xf0) >> 4]) & (1 << (HID_KEY_Z & 0X0f)))
+		) {
+			mapped_mode_active = !mapped_mode_active;
+		}
 		return;
 	}
 	if (recording_macro) {
@@ -281,6 +286,20 @@ static void raw_mode (hid_keyboard_report_t const* report) {
 	}
 }
 
+static void mapped_mode (hid_keyboard_report_t const* report) {
+	printf (
+		"Report received in mapped mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
+		report->keycode[0],
+		report->keycode[1],
+		report->keycode[2],
+		report->keycode[3],
+		report->keycode[4],
+		report->keycode[5],
+		report->keycode[6],
+		report->modifier
+	);
+}
+
 static void visualize_bigm (
 	uint16_t cur[16],
 	uint16_t presses[16],
@@ -315,17 +334,3 @@ static void visualize_bigm (
 	}
 }
 
-static void mapped_mode (hid_keyboard_report_t const *report) {
-	printf (
-		"Report received in mapped mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
-		report->keycode[0],
-		report->keycode[1],
-		report->keycode[2],
-		report->keycode[3],
-		report->keycode[4],
-		report->keycode[5],
-		report->keycode[6],
-		report->modifier
-	);
-	return;
-}

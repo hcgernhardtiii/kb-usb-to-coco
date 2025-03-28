@@ -9,7 +9,10 @@
 #include "mt8808.h"
 #include "raw_matrix.h"
 
-#define MAX_REPORT  4
+#define MAX_REPORT 4
+
+#define MATRIX_HAS(mtx, key) (!!(((mtx)[((key) & 0xf0) >> 4]) & (1 << ((key) & 0X0f))))
+#define MATRIX_CLEAR(mtx, key) ((mtx)[((key) & 0xf0) >> 4] &= (~(1 << ((key) & 0x0f))))
 
 static struct {
   uint8_t report_count;
@@ -33,6 +36,7 @@ static void process_kbd_report(hid_keyboard_report_t const *report);
 static void cls();
 static void putblock (int row, int col);
 static void clrblock (int row, int col);
+static inline void mt8808_send (int row, int col, int data);
 
 // process the matrix in raw mode
 static void raw_mode (hid_keyboard_report_t const *report);
