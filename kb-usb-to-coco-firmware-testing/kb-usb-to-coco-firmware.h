@@ -2,6 +2,7 @@
 #define ___KB_USB_TO_COCO_FIRMWARE_H
 
 #include <stdio.h>
+#include "time.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "bsp/board_api.h"
@@ -31,17 +32,40 @@ static bool mapped_mode_active = false;
 //   `process_kbd_report()`)
 static bool recording_macro = false;
 
+// For mapped mode, we need to keep track of the shift state of a key when it
+//   was pressed.  This needs to be global so we can clear it upon entering
+//   mapped mode.
+uint8_t mapped_mode_key_states[256];
+
 void led_blinking_task (void);
 static void process_kbd_report(hid_keyboard_report_t const *report);
-static void cls();
-static void putblock (int row, int col);
-static void clrblock (int row, int col);
-static inline void mt8808_send (int row, int col, int data);
 
 // process the matrix in raw mode
 static void raw_mode (hid_keyboard_report_t const *report);
 // process the matrix in mapped mode
-static void mapped_mode (hid_keyboard_report_t const *report);
+static void mapped_mode (
+	hid_keyboard_report_t const* report,
+	uint16_t cur_report[16],
+	uint16_t presses[16],
+	uint16_t releases[16]
+);
+// map a keypress.  We clear the key from the presses matrix to allow for
+//   later processing of unmapped keys.
+#define MAP_PRESS(key, row, col, state) \
+	if (MATRIX_HAS (presses, (key))) { \
+		mt8808_send ((row), (col), 1); \
+		mapped_mode_key_states[(key)] = (state); \
+		MATRIX_CLEAR (presses, (key)); \
+	}
+
+// Send a single keyswitch matrix operation to the mt8808
+static inline void mt8808_send (int row, int col, int data);
+// Insert a pause to allow for shift state toggling
+static inline void mt8808_pause();
+// Record a matrix switch operation
+static inline void macro_record_key (int row, int col, int data);
+// Record a keystroke pause
+static inline void macro_record_pause();
 
 // Visualize the “big” matrix—the raw keyboard scan itself
 static void visualize_bigm (

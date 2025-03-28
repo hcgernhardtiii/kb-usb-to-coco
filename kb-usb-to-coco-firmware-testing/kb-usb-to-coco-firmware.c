@@ -177,6 +177,8 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 			!!((presses[(HID_KEY_Z & 0xf0) >> 4]) & (1 << (HID_KEY_Z & 0X0f)))
 		) {
 			mapped_mode_active = !mapped_mode_active;
+			// Clear the mapped mode key states buffer
+			for (int i = 0; i < 256; i++) mapped_mode_key_states[i] = 0;
 		}
 		return;
 	}
@@ -245,59 +247,101 @@ static void raw_mode (hid_keyboard_report_t const* report) {
 		release = prev_poll[i] & (~cur_poll[i]);
 		press = (~prev_poll[i]) & cur_poll[i];
 		if (!!release) for (j = 0; j < 8; j++) if (!!((release >> j) & 1)) {
-			pins =
-				(uint32_t)i << MT_ROW_SHIFT |
-				(uint32_t)j << MT_COL_SHIFT;
-				// Set up the data and address
-				gpio_put_masked (
-					MT_DATA | MT_ADDR,
-					pins
-				);
-				MT_HOLD_T();
-				// Strobe the data and address
-				gpio_put (MT_STROBE_GPIO, 1);
-				MT_STROBE_T();
-				gpio_put (MT_STROBE_GPIO, 0);
-				MT_HOLD_T();
-				// Release the data and address pins
-				gpio_clr_mask (MT_DATA | MT_ADDR);
-				MT_WAIT_T();
+			mt8808_send (i, j, 0);
 		}
 		if (!!press) for (j = 0; j < 8; j++) if (!!((press >> j) & 1)) {
-			pins =
-				(uint32_t)i << MT_ROW_SHIFT |
-				(uint32_t)j << MT_COL_SHIFT |
-				1 << MT_DATA_SHIFT;
-				// Set up the data and address
-				gpio_put_masked (
-					MT_DATA | MT_ADDR,
-					pins
-				);
-				MT_HOLD_T();
-				// Strobe the data and address
-				gpio_put (MT_STROBE_GPIO, 1);
-				MT_STROBE_T();
-				gpio_put (MT_STROBE_GPIO, 0);
-				MT_HOLD_T();
-				// Release the data and address pins
-				gpio_clr_mask (MT_DATA | MT_ADDR);
-				MT_WAIT_T();
+			mt8808_send (i, j, 1);
 		}
 	}
+	macro_record_pause();
 }
 
-static void mapped_mode (hid_keyboard_report_t const* report) {
-	printf (
-		"Report received in mapped mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
-		report->keycode[0],
-		report->keycode[1],
-		report->keycode[2],
-		report->keycode[3],
-		report->keycode[4],
-		report->keycode[5],
-		report->keycode[6],
-		report->modifier
+static void mapped_mode (
+	hid_keyboard_report_t const* report,
+	uint16_t cur_report[16],
+	uint16_t presses[16],
+	uint16_t releases[16]
+) {
+	bool is_shifted = !!(report->modifier & 0x22);
+	if (is_shifted && (
+		!!presses[0x1] || !!presses[0x2] || !!presses[0x3] ||
+		!!presses[0x4] || !!presses[0x5] || !!presses[0x6]
+	)) {
+		// First let's check for our shift toggle specials
+		if (
+			MATRIX_HAS (presses, HID_KEY_2) ||
+			MATRIX_HAS (presses, HID_KEY_6) ||
+			MATRIX_HAS (presses, HID_KEY_SEMICOLON)
+		) {
+			// These specials need to be unshifted
+			mt8808_pause();
+			mt8808_send (6, 7, 0);
+			// - `HID_KEY_2` for `@`
+			MAP_PRESS (HID_KEY_2, 4, 2, 0x3);
+			// - `HID_KEY_6` for `^`
+			MAP_PRESS (HID_KEY_6, 4, 2, 0x3);
+			// - `HID_KEY_SEMICOLON` for `:`
+			MAP_PRESS (HID_KEY_SEMICOLON, 5, 2, 0x3);
+			mt8808_pause();
+			// Restore the shift state
+			mt8808_send (6, 7, 1);
+		}
+		// Now we go through our other specials:
+		if (!!presses[0x2] || !!presses[0x3]) {
+			// These are the keypresses we translate
+			// - `HID_KEY_7` for `&` 
+			MAP_PRESS (HID_KEY_7, 4, 6, 0x3);
+			// - `HID_KEY_8` for `*` 
+			MAP_PRESS (HID_KEY_8, 4, 2, 0x3);
+			// - `HID_KEY_9` for `(` 
+			MAP_PRESS (HID_KEY_9, 4, 2, 0x3);
+			// - `HID_KEY_0` for `)` 
+			MAP_PRESS (HID_KEY_0, 4, 2, 0x3);
+			// - `HID_KEY_EQUAL` for `+`
+			MAP_PRESS (HID_KEY_EQUAL, 4, 2, 0x3);
+			// - `HID_KEY_APOSTROPHE` for `"`
+			MAP_PRESS (HID_KEY_APOSTROPHE, 4, 2, 0x3);
+		}
+	}
+	macro_record_pause();
+}
+
+inline static __attribute__((always_inline)) void mt8808_send (
+	int row, int col, int data
+) {
+	// Save the switch operation if we're recording a macro
+	if (recording_macro) macro_record_key (row, col, data);
+	// Set up the data and address
+	gpio_put_masked (
+		MT_DATA | MT_ADDR,
+		(uint32_t)row << MT_ROW_SHIFT |
+		(uint32_t)col << MT_COL_SHIFT |
+		(uint32_t)data << MT_DATA_SHIFT
 	);
+	MT_HOLD_T();
+	// Strobe the data and address
+	gpio_put (MT_STROBE_GPIO, 1);
+	MT_STROBE_T();
+	gpio_put (MT_STROBE_GPIO, 0);
+	MT_HOLD_T();
+	// Release the data and address pins
+	gpio_clr_mask (MT_DATA | MT_ADDR);
+	MT_WAIT_T();
+}
+
+inline static __attribute__((always_inline)) void mt8808_pause() {
+	if (recording_macro) macro_record_pause();
+	sleep_ms (17);
+}
+
+inline static __attribute__((always_inline)) void macro_record_key (
+	int row, int col, int data
+) {
+
+}
+
+inline static __attribute__((always_inline)) void macro_record_pause() {
+
 }
 
 static void visualize_bigm (
