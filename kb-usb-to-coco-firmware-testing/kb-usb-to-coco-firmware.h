@@ -11,9 +11,6 @@
 
 #define MAX_REPORT 4
 
-#define MATRIX_HAS(mtx, key) (!!(((mtx)[((key) & 0xf0) >> 4]) & (1 << ((key) & 0X0f))))
-#define MATRIX_CLEAR(mtx, key) ((mtx)[((key) & 0xf0) >> 4] &= (~(1 << ((key) & 0x0f))))
-
 static struct {
   uint8_t report_count;
   tuh_hid_report_info_t report_info[MAX_REPORT];
