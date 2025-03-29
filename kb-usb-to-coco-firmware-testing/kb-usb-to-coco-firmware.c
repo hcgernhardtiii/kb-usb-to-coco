@@ -173,9 +173,7 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 
 	if (gui_is_pressed) {
 		// check for GUI-Z, which toggles the mapped mode
-		if (
-			!!((presses[(HID_KEY_Z & 0xf0) >> 4]) & (1 << (HID_KEY_Z & 0X0f)))
-		) {
+		if (MATRIX_HAS(presses, HID_KEY_Z)) {
 			mapped_mode_active = !mapped_mode_active;
 		}
 		return;
@@ -245,43 +243,10 @@ static void raw_mode (hid_keyboard_report_t const* report) {
 		release = prev_poll[i] & (~cur_poll[i]);
 		press = (~prev_poll[i]) & cur_poll[i];
 		if (!!release) for (j = 0; j < 8; j++) if (!!((release >> j) & 1)) {
-			pins =
-				(uint32_t)i << MT_ROW_SHIFT |
-				(uint32_t)j << MT_COL_SHIFT;
-				// Set up the data and address
-				gpio_put_masked (
-					MT_DATA | MT_ADDR,
-					pins
-				);
-				MT_HOLD_T();
-				// Strobe the data and address
-				gpio_put (MT_STROBE_GPIO, 1);
-				MT_STROBE_T();
-				gpio_put (MT_STROBE_GPIO, 0);
-				MT_HOLD_T();
-				// Release the data and address pins
-				gpio_clr_mask (MT_DATA | MT_ADDR);
-				MT_WAIT_T();
+			mt8808_send (i, j, 0);
 		}
 		if (!!press) for (j = 0; j < 8; j++) if (!!((press >> j) & 1)) {
-			pins =
-				(uint32_t)i << MT_ROW_SHIFT |
-				(uint32_t)j << MT_COL_SHIFT |
-				1 << MT_DATA_SHIFT;
-				// Set up the data and address
-				gpio_put_masked (
-					MT_DATA | MT_ADDR,
-					pins
-				);
-				MT_HOLD_T();
-				// Strobe the data and address
-				gpio_put (MT_STROBE_GPIO, 1);
-				MT_STROBE_T();
-				gpio_put (MT_STROBE_GPIO, 0);
-				MT_HOLD_T();
-				// Release the data and address pins
-				gpio_clr_mask (MT_DATA | MT_ADDR);
-				MT_WAIT_T();
+			mt8808_send (i, j, 1);
 		}
 	}
 }
@@ -298,6 +263,31 @@ static void mapped_mode (hid_keyboard_report_t const* report) {
 		report->keycode[6],
 		report->modifier
 	);
+}
+
+static inline void mt8808_send (int row, int col, int data) {
+	// Set up the data and address
+	gpio_put_masked (
+		MT_DATA | MT_ADDR,
+		(uint32_t)row << MT_ROW_SHIFT |
+		(uint32_t)col << MT_COL_SHIFT |
+		(uint32_t)data << MT_DATA_SHIFT
+	);
+	MT_HOLD_T();
+	// Strobe the data and address
+	gpio_put (MT_STROBE_GPIO, 1);
+	MT_STROBE_T();
+	gpio_put (MT_STROBE_GPIO, 0);
+	MT_HOLD_T();
+	// Release the data and address pins
+	gpio_clr_mask (MT_DATA | MT_ADDR);
+	MT_WAIT_T();
+	macro_record_send (row, col, data);
+}
+
+static inline void mt8808_pause() {
+	sleep_ms (17);
+	macro_record_pause();
 }
 
 static void visualize_bigm (

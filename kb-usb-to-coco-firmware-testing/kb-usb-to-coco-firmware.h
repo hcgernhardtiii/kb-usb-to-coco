@@ -2,6 +2,7 @@
 #define ___KB_USB_TO_COCO_FIRMWARE_H
 
 #include <stdio.h>
+#include "time.h"
 #include "pico/stdlib.h"
 #include "hardware/gpio.h"
 #include "bsp/board_api.h"
@@ -28,12 +29,20 @@ static bool mapped_mode_active = false;
 //   `process_kbd_report()`)
 static bool recording_macro = false;
 
+// Whether or not a keycode exists within a given matrix
+#define MATRIX_HAS(mtx, key) ( \
+	!!(((mtx)[((key) & 0xf0) >> 4]) & (1 << ((key) & 0x0f))) \
+)
+
 void led_blinking_task (void);
 static void process_kbd_report(hid_keyboard_report_t const *report);
 static void cls();
 static void putblock (int row, int col);
 static void clrblock (int row, int col);
 static inline void mt8808_send (int row, int col, int data);
+static inline void macro_record_send (int row, int col, int data) {}
+static inline void mt8808_pause();
+static inline void macro_record_pause() {}
 
 // process the matrix in raw mode
 static void raw_mode (hid_keyboard_report_t const *report);
