@@ -272,16 +272,30 @@ static void mapped_mode (
 		}
 	}
 	// Let's see what we have:
-	printf (
-		"%02x %02x %02x %02x %02x %02x [%d]\n",
-		keypresses[0],
-		keypresses[1],
-		keypresses[2],
-		keypresses[3],
-		keypresses[4],
-		keypresses[5],
-		modstate
-	);
+	for (int i = 0; i < 6; i++) {
+		if (!keypresses[i]) continue;
+		// Send the presses
+		for (int j = 0; j < 4; j++) {
+			if (ecb_map[keypresses[i]][modstate][j] & 0100) continue;
+			mt8808_send (
+				(ecb_map[keypresses[i]][modstate][j] >> 3) & 07,
+				ecb_map[keypresses[i]][modstate][j] & 07,
+				1
+			);
+		}
+		// Wait for it…
+		mt8808_pause();
+		// Now send the releases
+		for (int j = 0; j < 4; j++) {
+			if (ecb_map[keypresses[i]][modstate][j] & 0100) continue;
+			mt8808_send (
+				(ecb_map[keypresses[i]][modstate][j] >> 3) & 07,
+				ecb_map[keypresses[i]][modstate][j] & 07,
+				0
+			);
+		}
+	}
+	printf ("\n");
 }
 
 static inline void mt8808_send (int row, int col, int data) {

@@ -9,6 +9,7 @@
 #include "tusb.h"
 #include "mt8808.h"
 #include "raw_matrix.h"
+#include "mapped_matrix.h"
 
 #define MAX_REPORT 4
 
