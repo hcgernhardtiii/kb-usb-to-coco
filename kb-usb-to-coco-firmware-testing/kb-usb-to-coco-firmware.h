@@ -47,7 +47,10 @@ static inline void macro_record_pause() {}
 // process the matrix in raw mode
 static void raw_mode (hid_keyboard_report_t const *report);
 // process the matrix in mapped mode
-static void mapped_mode (hid_keyboard_report_t const *report);
+static void mapped_mode (
+	hid_keyboard_report_t const *report,
+	uint16_t presses[16]
+);
 
 // Visualize the “big” matrix—the raw keyboard scan itself
 static void visualize_bigm (

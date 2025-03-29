@@ -184,7 +184,7 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 	// check for macro playback keypress here (macro should record raw/mapped
 	//   state)
 	if (mapped_mode_active) {
-		mapped_mode (report);
+		mapped_mode (report, presses);
 	} else {
 		raw_mode (report);
 	}
@@ -251,17 +251,36 @@ static void raw_mode (hid_keyboard_report_t const* report) {
 	}
 }
 
-static void mapped_mode (hid_keyboard_report_t const* report) {
+static void mapped_mode (
+	hid_keyboard_report_t const *report,
+	uint16_t presses[16]
+) {
+	// We'll have a maximum of six new presses in any given report
+	int keypresses[6] = {0, 0, 0, 0, 0, 0};
+	// We'll need to know the *current* status of our modifier bits.  We'll map
+	//   this to an integer so we've got easy subscripting into our map array.
+	int modstate = !!(report->modifier & 0x11) |
+		((!!(report->modifier & 0x22)) << 1) |
+		((!!(report->modifier & 0x44)) << 2);
+	// Let's get the keypresses out
+	int press = 0;
+	for (int i = 0; i < 16; i++) if (!!presses[i]) { 
+		uint16_t the_presses = presses[i];
+		for (int j = 0; j < 16; j++) {
+			if (!!(the_presses & 1)) keypresses[press++] = (i << 4) | j;
+			the_presses = the_presses >> 1;
+		}
+	}
+	// Let's see what we have:
 	printf (
-		"Report received in mapped mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
-		report->keycode[0],
-		report->keycode[1],
-		report->keycode[2],
-		report->keycode[3],
-		report->keycode[4],
-		report->keycode[5],
-		report->keycode[6],
-		report->modifier
+		"%02x %02x %02x %02x %02x %02x [%d]\n",
+		keypresses[0],
+		keypresses[1],
+		keypresses[2],
+		keypresses[3],
+		keypresses[4],
+		keypresses[5],
+		modstate
 	);
 }
 
