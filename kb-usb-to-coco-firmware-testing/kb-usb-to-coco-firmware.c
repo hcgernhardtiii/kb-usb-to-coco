@@ -295,7 +295,6 @@ static void mapped_mode (
 			);
 		}
 	}
-	printf ("\n");
 }
 
 static inline void mt8808_send (int row, int col, int data) {
@@ -319,7 +318,7 @@ static inline void mt8808_send (int row, int col, int data) {
 }
 
 static inline void mt8808_pause() {
-	sleep_ms (17);
+	sleep_ms (25);
 	macro_record_pause();
 }
 
