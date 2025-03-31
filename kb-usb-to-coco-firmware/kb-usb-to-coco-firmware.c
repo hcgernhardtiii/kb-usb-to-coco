@@ -1,118 +1,4 @@
-#include <stdio.h>
-#include "pico/stdlib.h"
-#include "hardware/gpio.h"
-#include "bsp/board_api.h"
-#include "tusb.h"
-
-#define USE_ANSI_ESCAPE   0
-#define MAX_REPORT  4
-
-// Call counters
-static uint8_t pcount=0;
-static uint8_t ccount=0;
-// The previous keyboard poll values
-static uint8_t prev_poll[7] = {0,0,0,0,0,0,0};
-// The current keyboard poll values
-static uint8_t cur_poll[7] = {0,0,0,0,0,0,0};
-
-static uint8_t raw_matrix [7][8] = {{
-	HID_KEY_BRACKET_LEFT,
-	HID_KEY_A,
-	HID_KEY_B,
-	HID_KEY_C,
-	HID_KEY_D,
-	HID_KEY_E,
-	HID_KEY_F,
-	HID_KEY_G
-},{
-	HID_KEY_H,
-	HID_KEY_I,
-	HID_KEY_J,
-	HID_KEY_K,
-	HID_KEY_L,
-	HID_KEY_M,
-	HID_KEY_N,
-	HID_KEY_O
-},{
-	HID_KEY_P,
-	HID_KEY_Q,
-	HID_KEY_R,
-	HID_KEY_S,
-	HID_KEY_T,
-	HID_KEY_U,
-	HID_KEY_V,
-	HID_KEY_W
-},{
-	HID_KEY_X,
-	HID_KEY_Y,
-	HID_KEY_Z,
-	HID_KEY_ARROW_UP,
-	HID_KEY_ARROW_DOWN,
-	HID_KEY_ARROW_LEFT,
-	HID_KEY_ARROW_RIGHT,
-	HID_KEY_SPACE
-},{
-	HID_KEY_0,
-	HID_KEY_1,
-	HID_KEY_2,
-	HID_KEY_3,
-	HID_KEY_4,
-	HID_KEY_5,
-	HID_KEY_6,
-	HID_KEY_7
-},{
-	HID_KEY_8,
-	HID_KEY_9,
-	HID_KEY_MINUS,
-	HID_KEY_SEMICOLON,
-	HID_KEY_COMMA,
-	HID_KEY_EQUAL,
-	HID_KEY_PERIOD,
-	HID_KEY_SLASH
-},{
-	HID_KEY_ENTER,
-	HID_KEY_HOME,
-	HID_KEY_ESCAPE,
-	HID_KEY_NONE,	// Will be alt
-	HID_KEY_NONE,	// Will be ctrl
-	HID_KEY_F1,
-	HID_KEY_F2,
-	HID_KEY_NONE	// Will be shift (either)
-}};
-static uint8_t matrix_row_of[256];
-static uint8_t matrix_col_of[256];
-
-static struct {
-  uint8_t report_count;
-  tuh_hid_report_info_t report_info[MAX_REPORT];
-} hid_info[CFG_TUH_HID];
-
-static bool screen_is_dirty = false;
-
-void led_blinking_task (void);
-static void process_kbd_report(hid_keyboard_report_t const *report);
-static void cls();
-static void putblock (int row, int col);
-static void clrblock (int row, int col);
-
-#define MT_RESET_GPIO 2
-#define MT_STROBE_GPIO 3
-
-#define MT_RESET 0x004
-#define MT_STROBE 0x008
-#define MT_DATA 0x010
-#define MT_ADDR 0x7E0
-
-#define MT_RESET_SHIFT 2
-#define MT_STROBE_SHIFT 3
-#define MT_DATA_SHIFT 4
-#define MT_ROW_SHIFT 5
-#define MT_COL_SHIFT 8
-
-#define MT_HOLD_T() asm volatile ("nop\n\tnop");
-#define MT_STROBE_T() MT_HOLD_T() MT_HOLD_T()
-#define MT_RESET_T() MT_STROBE_T() MT_STROBE_T()
-#define MT_WAIT_T() MT_RESET_T() MT_RESET_T()
+#include "kb-usb-to-coco-firmware.h"
 
 int main()
 {
@@ -135,16 +21,16 @@ int main()
 	int i, j;
 	printf ("Initializing lookups…\n");
 	for (i = 0; i < 256; i++) {
-		matrix_row_of[i] = 255;
-		matrix_col_of[i] = 255;
+		raw_matrix_row_of[i] = 255;
+		raw_matrix_col_of[i] = 255;
 	}
-	matrix_row_of[HID_KEY_BACKSPACE] = 3;
-	matrix_col_of[HID_KEY_BACKSPACE] = 5;
+	raw_matrix_row_of[HID_KEY_BACKSPACE] = 3;
+	raw_matrix_col_of[HID_KEY_BACKSPACE] = 5;
 	printf ("Populating lookups…\n");
 	for (i = 0; i < 7; i++) {
 		for (j = 0; j < 8; j++) {
-			matrix_row_of [raw_matrix[i][j]] = i;
-			matrix_col_of [raw_matrix[i][j]] = j;
+			raw_matrix_row_of [raw_matrix[i][j]] = i;
+			raw_matrix_col_of [raw_matrix[i][j]] = j;
 		}
 	}
 	screen_is_dirty = true;
@@ -244,22 +130,147 @@ void tuh_hid_report_received_cb(
 }
 
 static void process_kbd_report (hid_keyboard_report_t const* report) {
+	static uint16_t prev_report[16];
+	static uint16_t cur_report[16];
+	static uint16_t presses[16];
+	static uint16_t releases[16];
+	uint8_t i, j, keycode;
+
+	// Rotate the report key data
+	for (i = 0; i < 16; i++) {
+		prev_report[i] = cur_report[i];
+		cur_report[i] = 0;
+	}
+	// Matrixify the modifier keys.  Blessedly, this maps directly to the
+	//   HID keycodes, and they are the only keycodes at row 0xe
+	if (!!(report->modifier)) {
+		cur_report[0xe] = (uint16_t)report->modifier & 0x0f;
+	}
+	for (i = 0; i < 6; i++) {
+		if (!!(keycode = report->keycode[i])) {
+			cur_report[(keycode & 0xf0) >> 4] |= 1 << (keycode & 0x0f);
+		}
+	}
+	// Walk through the matrixed reports and calculate the presses and releases.
+	for (i = 0; i < 16; i++) {
+		releases[i] = prev_report[i] & (~cur_report[i]);
+		presses[i] = (~prev_report[i]) & cur_report[i];
+	}
+	if (!!(presses[0xe] & 0x88)) {
+		gui_is_pressed = true;
+		printf ("GUI key is pressed\n");
+	}
+	if (!!(releases[0xe] & 0x88)) {
+		printf ("GUI key is released\n");
+		gui_is_pressed = false;
+	}
+
+	if (gui_is_pressed) {
+		// check for GUI-Z, which toggles the mapped mode
+		printf (
+			"Checking for GUI key sequences %02x %02x %02x %02x %02x %02x [%02x]\n",
+			report->keycode[0],
+			report->keycode[1],
+			report->keycode[2],
+			report->keycode[3],
+			report->keycode[4],
+			report->keycode[5],
+			report->modifier
+		);
+		if (
+			!!(presses[(HID_KEY_Z & 0xf0) >> 4] & (1 << (HID_KEY_Z & 0x0f)))
+		) {
+			mapped_mode_active = !mapped_mode_active;
+		}
+		return;
+	}
+	if (mapped_mode_active) {
+		mapped_mode (report, presses);
+	} else {
+		raw_mode (report);
+	}
+}
+
+static void mapped_mode (
+	hid_keyboard_report_t const* report,
+	uint16_t presses[16]
+) {
+	printf (
+		"Report recieved in mapped mode: %02x %02x %02x %02x %02x %02x [%02x]\n",
+		report->keycode[0],
+		report->keycode[1],
+		report->keycode[2],
+		report->keycode[3],
+		report->keycode[4],
+		report->keycode[5],
+		report->modifier
+	);
+	// We'll have a maximum of six new presses in any given report
+	int keypresses[6] = {0, 0, 0, 0, 0, 0};
+	// We'll need to know the *current* status of our modifier bits.  We'll map
+	//   this to an integer so we've got easy subscripting into our map array.
+	int modstate = !!(report->modifier & 0x11) |
+		!!(report->modifier & 0x22) << 1 |
+		!!(report->modifier & 0x44) << 2;
+	// Let's get the keypresses out
+	int press = 0;
+	for (int i = 0; i < 16; i++) if (!!presses[i]) {
+		uint16_t the_presses = presses[i];
+		for (int j = 0; j < 16; j++) {
+			if (!!(the_presses & 1)) keypresses[press++] = (i << 4) | j;
+			the_presses = the_presses >> 1;
+		}
+	}
+	// Let's see what we have:
+	for (int i = 0; i < 6; i++) {
+		if (!keypresses[i]) continue;
+		// Send the presses
+		for (int j = 0; j < 4; j++) {
+			if (ecb_map[keypresses[i]][modstate][j] & 0100) continue;
+			mt8808_send (
+				(ecb_map[keypresses[i]][modstate][j] >> 3) & 07,
+				ecb_map[keypresses[i]][modstate][j] & 07,
+				1
+			);
+		}
+		// Wait for it…
+		mt8808_pause();
+		// Now send the release
+		for (int j = 0; j < 4; j++) {
+			if (ecb_map[keypresses[i]][modstate][j] & 0100) continue;
+			mt8808_send (
+				(ecb_map[keypresses[i]][modstate][j] >> 3) & 07,
+				ecb_map[keypresses[i]][modstate][j] & 07,
+				0
+			);
+		}
+	}
+}
+
+static void raw_mode (hid_keyboard_report_t const* report) {
+	printf (
+		"Report recieved in raw mode: %02x %02x %02x %02x %02x %02x [%02x]\n",
+		report->keycode[0],
+		report->keycode[1],
+		report->keycode[2],
+		report->keycode[3],
+		report->keycode[4],
+		report->keycode[5],
+		report->modifier
+	);
+	// The previous keyboard poll values
+	static uint8_t prev_poll[7] = {0,0,0,0,0,0,0};
+	// The current keyboard poll values
+	static uint8_t cur_poll[7] = {0,0,0,0,0,0,0};
 	uint8_t i, j, press, release;
 	uint8_t keycode;
 	uint32_t pins;
-	if (screen_is_dirty) cls();
 
 	// Rotate the keypress data
 	for (i = 0; i < 7; i++) {
 		prev_poll[i] = cur_poll[i];	
 		cur_poll[i] = 0;
 	}
-	// If we have a GUI key pressed, we'll be doing other processing later on
-	if (!!(report->modifier & 0x88)) {
-		// Do GUI key processing here
-		return;
-	}
-	cls();
 	// Handle the modifier keys
 	if (!!(report->modifier & 0x44)) {
 		// Alt
@@ -275,41 +286,29 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 	}
 	// Handle all the other keys
 	for (i = 0; i < 6; i++) {
-		if ((keycode = report->keycode[i]) && matrix_row_of[keycode] < 7) {
-			cur_poll[matrix_row_of[keycode]] |= (1 << matrix_col_of[keycode]);
+		if ((keycode = report->keycode[i]) && raw_matrix_row_of[keycode] < 7) {
+			cur_poll[raw_matrix_row_of[keycode]] |= (1 << raw_matrix_col_of[keycode]);
 		}
 	}
 	// Calculate the key state changes
 	for (i = 0; i < 7; i++) {
 		release = prev_poll[i] & (~cur_poll[i]);
 		press = (~prev_poll[i]) & cur_poll[i];
-		printf (
-			"\e[%d;1f%d v:%02x c:%02x p:%02x r:%02x",
-			i+10, i, prev_poll[i], cur_poll[i], press, release
-		);
 		if (!!release) for (j = 0; j < 8; j++) {
-			if (!!((release >> j) & 1)) clrblock (i, j);
+			if (!!((release >> j) & 1)) mt8808_send (i, j, 0);
 		}
 		if (!!press) for (j = 0; j < 8; j++) {
-			if (!!((press >> j) & 1)) putblock (i, j);
+			if (!!((press >> j) & 1)) mt8808_send (i, j, 1);
 		}
 	}
 }
 
-static void putblock (int row, int col) {
-	ccount = 0;
-	pcount++;
-	uint32_t pins =
+static inline void mt8808_send (int row, int col, int data) {
+	gpio_put_masked (
+		MT_DATA | MT_ADDR,
 		(uint32_t)row << MT_ROW_SHIFT |
 		(uint32_t)col << MT_COL_SHIFT |
-		1 << MT_DATA_SHIFT;
-	row += 2; col += 2;
-	printf ("\e[%d;%df▒", row, col);
-
-	// Set up the data and address
-	gpio_put_masked (
-		MT_DATA | MT_ADDR,
-		pins
+		(uint32_t)data << MT_DATA_SHIFT
 	);
 	MT_HOLD_T();
 	// Strobe the data and address
@@ -320,41 +319,40 @@ static void putblock (int row, int col) {
 	// Release the data and address pins
 	gpio_clr_mask (MT_DATA | MT_ADDR);
 	MT_WAIT_T();
-	printf ("\e[24;1fp:%d c:%d", pcount, ccount);
-}
-static void clrblock (int row, int col) {
-	pcount=0;
-	ccount++;
-	uint32_t pins =
-		(uint32_t)row << MT_ROW_SHIFT |
-		(uint32_t)col << MT_COL_SHIFT ;
-	row += 2; col += 2;
-	printf ("\e[%d;%df ", row, col);
-
-	// Set up the data and address
-	gpio_put_masked (
-		MT_DATA | MT_ADDR,
-		pins
-	);
-	MT_HOLD_T();
-	// Strobe the data and address
-	gpio_put (MT_STROBE_GPIO, 1);
-	MT_STROBE_T();
-	gpio_put (MT_STROBE_GPIO, 0);
-	MT_HOLD_T();
-	// Release the data and address pins
-	gpio_clr_mask (MT_DATA | MT_ADDR);
-	MT_WAIT_T();
-	printf ("\e[24;1fp:%d c:%d", pcount, ccount);
 }
 
-static void cls() {
-	// // Run the reset
-	// gpio_put (MT_RESET_GPIO, 1);
-	// MT_RESET_T();
-	// gpio_put (MT_RESET_GPIO, 0);
-	// MT_WAIT_T();
+static inline void mt8808_pause() {
+	sleep_ms (25);
+}
 
-	printf ("\e[H\e[J 01234567\n0\n1\n2\n3\n4\n5\n6\e[24;1f");
-	screen_is_dirty = false;
+static void visualize_bigm (
+	uint16_t cur[16],
+	uint16_t presses[16],
+	uint16_t releases[16]
+) {
+	static bool do_setup = true;
+	if (do_setup) {
+		printf (
+			"\e[H\e[J     CURRENT          PRESSED          RELEASED\n 0123456789ABCDEF 0123456789ABCDEF 0123456789ABCDEF\n0\n1\n2\n3\n4\n5\n6\n7\n8\n9\nA\nB\nC\nD\nE\nF\e[24;1f"
+		);
+		do_setup = false;
+	}
+	for (int row = 0; row < 16; row++) for (int col = 0; col < 16; col++) {
+		// The current report
+		printf (
+			"\e[%d;%df%s",
+			row+3, col+2,
+			!!(cur[row] & (1 << col)) ? "▒" : " "
+		);
+		printf (
+			"\e[%d;%df%s",
+			row+3, col+2+17,
+			!!(presses[row] & (1 << col)) ? "▒" : " "
+		);
+		printf (
+			"\e[%d;%df%s",
+			row+3, col+2+17+17,
+			!!(releases[row] & (1 << col)) ? "▒" : " "
+		);
+	}
 }
