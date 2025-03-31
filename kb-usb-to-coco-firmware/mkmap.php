@@ -21,7 +21,11 @@
 	function mapkey ($usb, $modstate, ...$cocos) {
 		global $map;
 		$map[$usb][$modstate] = array ();
+<<<<<<< HEAD
 		foreach ($cocos as $coco) $map[$usb][$modstate][] = $coco;
+=======
+		foreach ($cocos as $coco) $map [$usb][$modstate][] = $coco;
+>>>>>>> next-video-take-2
 	}
 	function clearmap ($usb, $modstate) {
 		global $map;
