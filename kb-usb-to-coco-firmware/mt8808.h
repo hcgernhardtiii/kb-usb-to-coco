@@ -20,8 +20,4 @@
 #define MT_RESET_T() MT_STROBE_T() MT_STROBE_T()
 #define MT_WAIT_T() MT_RESET_T() MT_RESET_T()
 
-<<<<<<< HEAD
 #endif // ___MT8808_H
-=======
-#endif
->>>>>>> next-video-take-2

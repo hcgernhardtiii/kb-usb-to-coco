@@ -70,9 +70,6 @@ static uint8_t raw_matrix [7][8] = {{
 static uint8_t raw_matrix_row_of[256];
 static uint8_t raw_matrix_col_of[256];
 
-<<<<<<< HEAD
 
 
-=======
->>>>>>> next-video-take-2
 #endif

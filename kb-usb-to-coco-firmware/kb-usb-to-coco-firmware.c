@@ -142,11 +142,7 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 
 	// Rotate the report key data
 	for (i = 0; i < 16; i++) {
-<<<<<<< HEAD
 		prev_report[i] = cur_report[i];	
-=======
-		prev_report[i] = cur_report[i];
->>>>>>> next-video-take-2
 		cur_report[i] = 0;
 	}
 	// Matrixify the modifier keys.  Blessedly, this maps directly to the
@@ -154,22 +150,13 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 	if (!!(report->modifier)) {
 		cur_report[0xe] = (uint16_t)report->modifier & 0x0f;
 	}
-<<<<<<< HEAD
-	// Walk through the key reports and place them in the matrix.  The row is
-	//   the high nybble of the keycode.
-=======
->>>>>>> next-video-take-2
 	for (i = 0; i < 6; i++) {
 		if (!!(keycode = report->keycode[i])) {
 			cur_report[(keycode & 0xf0) >> 4] |= 1 << (keycode & 0x0f);
 		}
 	}
 	// Walk through the matrixed reports and calculate the presses and releases.
-<<<<<<< HEAD
-	for (i = 0; i < 15; i++) {
-=======
 	for (i = 0; i < 16; i++) {
->>>>>>> next-video-take-2
 		releases[i] = prev_report[i] & (~cur_report[i]);
 		presses[i] = (~prev_report[i]) & cur_report[i];
 	}
@@ -184,9 +171,6 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 
 	if (gui_is_pressed) {
 		// check for GUI-Z, which toggles the mapped mode
-<<<<<<< HEAD
-		if (MATRIX_HAS(presses, HID_KEY_Z)) {
-=======
 		printf (
 			"Checking for GUI key sequences %02x %02x %02x %02x %02x %02x [%02x]\n",
 			report->keycode[0],
@@ -200,34 +184,15 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 		if (
 			!!(presses[(HID_KEY_Z & 0xf0) >> 4] & (1 << (HID_KEY_Z & 0x0f)))
 		) {
->>>>>>> next-video-take-2
 			mapped_mode_active = !mapped_mode_active;
 		}
 		return;
 	}
-<<<<<<< HEAD
-	if (recording_macro) {
-		// call the macro key add here
-	}
-	// check for macro playback keypress here (macro should record raw/mapped
-	//   state)
-=======
->>>>>>> next-video-take-2
 	if (mapped_mode_active) {
 		mapped_mode (report, presses);
 	} else {
 		raw_mode (report);
 	}
-<<<<<<< HEAD
-
-
-	// visualize_bigm (cur_report, presses, releases);
-}
-
-static void raw_mode (hid_keyboard_report_t const* report) {
-	printf (
-		"Report received in raw mode: %02x %02x %02x %02x %02x %02x %02x [%02x]\n",
-=======
 }
 
 static void mapped_mode (
@@ -289,17 +254,12 @@ static void mapped_mode (
 static void raw_mode (hid_keyboard_report_t const* report) {
 	printf (
 		"Report recieved in raw mode: %02x %02x %02x %02x %02x %02x [%02x]\n",
->>>>>>> next-video-take-2
 		report->keycode[0],
 		report->keycode[1],
 		report->keycode[2],
 		report->keycode[3],
 		report->keycode[4],
 		report->keycode[5],
-<<<<<<< HEAD
-		report->keycode[6],
-=======
->>>>>>> next-video-take-2
 		report->modifier
 	);
 	// The previous keyboard poll values
@@ -331,87 +291,23 @@ static void raw_mode (hid_keyboard_report_t const* report) {
 	// Handle all the other keys
 	for (i = 0; i < 6; i++) {
 		if ((keycode = report->keycode[i]) && raw_matrix_row_of[keycode] < 7) {
-<<<<<<< HEAD
-			cur_poll[raw_matrix_row_of[keycode]] |=
-				(1 << raw_matrix_col_of[keycode]);
-=======
 			cur_poll[raw_matrix_row_of[keycode]] |= (1 << raw_matrix_col_of[keycode]);
->>>>>>> next-video-take-2
 		}
 	}
 	// Calculate the key state changes
 	for (i = 0; i < 7; i++) {
 		release = prev_poll[i] & (~cur_poll[i]);
 		press = (~prev_poll[i]) & cur_poll[i];
-<<<<<<< HEAD
-		if (!!release) for (j = 0; j < 8; j++) if (!!((release >> j) & 1)) {
-			mt8808_send (i, j, 0);
-		}
-		if (!!press) for (j = 0; j < 8; j++) if (!!((press >> j) & 1)) {
-			mt8808_send (i, j, 1);
-=======
 		if (!!release) for (j = 0; j < 8; j++) {
 			if (!!((release >> j) & 1)) mt8808_send (i, j, 0);
 		}
 		if (!!press) for (j = 0; j < 8; j++) {
 			if (!!((press >> j) & 1)) mt8808_send (i, j, 1);
->>>>>>> next-video-take-2
-		}
-	}
-}
-
-<<<<<<< HEAD
-static void mapped_mode (
-	hid_keyboard_report_t const *report,
-	uint16_t presses[16]
-) {
-	// We'll have a maximum of six new presses in any given report
-	int keypresses[6] = {0, 0, 0, 0, 0, 0};
-	// We'll need to know the *current* status of our modifier bits.  We'll map
-	//   this to an integer so we've got easy subscripting into our map array.
-	int modstate = !!(report->modifier & 0x11) |
-		((!!(report->modifier & 0x22)) << 1) |
-		((!!(report->modifier & 0x44)) << 2);
-	// Let's get the keypresses out
-	int press = 0;
-	for (int i = 0; i < 16; i++) if (!!presses[i]) { 
-		uint16_t the_presses = presses[i];
-		for (int j = 0; j < 16; j++) {
-			if (!!(the_presses & 1)) keypresses[press++] = (i << 4) | j;
-			the_presses = the_presses >> 1;
-		}
-	}
-	// Let's see what we have:
-	for (int i = 0; i < 6; i++) {
-		if (!keypresses[i]) continue;
-		// Send the presses
-		for (int j = 0; j < 4; j++) {
-			if (ecb_map[keypresses[i]][modstate][j] & 0100) continue;
-			mt8808_send (
-				(ecb_map[keypresses[i]][modstate][j] >> 3) & 07,
-				ecb_map[keypresses[i]][modstate][j] & 07,
-				1
-			);
-		}
-		// Wait for it…
-		mt8808_pause();
-		// Now send the releases
-		for (int j = 0; j < 4; j++) {
-			if (ecb_map[keypresses[i]][modstate][j] & 0100) continue;
-			mt8808_send (
-				(ecb_map[keypresses[i]][modstate][j] >> 3) & 07,
-				ecb_map[keypresses[i]][modstate][j] & 07,
-				0
-			);
 		}
 	}
 }
 
 static inline void mt8808_send (int row, int col, int data) {
-	// Set up the data and address
-=======
-static inline void mt8808_send (int row, int col, int data) {
->>>>>>> next-video-take-2
 	gpio_put_masked (
 		MT_DATA | MT_ADDR,
 		(uint32_t)row << MT_ROW_SHIFT |
@@ -427,18 +323,10 @@ static inline void mt8808_send (int row, int col, int data) {
 	// Release the data and address pins
 	gpio_clr_mask (MT_DATA | MT_ADDR);
 	MT_WAIT_T();
-<<<<<<< HEAD
-	macro_record_send (row, col, data);
-=======
->>>>>>> next-video-take-2
 }
 
 static inline void mt8808_pause() {
 	sleep_ms (25);
-<<<<<<< HEAD
-	macro_record_pause();
-=======
->>>>>>> next-video-take-2
 }
 
 static void visualize_bigm (
@@ -454,38 +342,21 @@ static void visualize_bigm (
 		do_setup = false;
 	}
 	for (int row = 0; row < 16; row++) for (int col = 0; col < 16; col++) {
-<<<<<<< HEAD
-		// the current report
-=======
 		// The current report
->>>>>>> next-video-take-2
 		printf (
 			"\e[%d;%df%s",
 			row+3, col+2,
 			!!(cur[row] & (1 << col)) ? "▒" : " "
 		);
-<<<<<<< HEAD
-		// the presses for this report
-=======
->>>>>>> next-video-take-2
 		printf (
 			"\e[%d;%df%s",
 			row+3, col+2+17,
 			!!(presses[row] & (1 << col)) ? "▒" : " "
 		);
-<<<<<<< HEAD
-		// the releases for this report
-=======
->>>>>>> next-video-take-2
 		printf (
 			"\e[%d;%df%s",
 			row+3, col+2+17+17,
 			!!(releases[row] & (1 << col)) ? "▒" : " "
 		);
 	}
-<<<<<<< HEAD
 }
-
-=======
-}
->>>>>>> next-video-take-2
