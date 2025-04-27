@@ -18,6 +18,22 @@ int main()
 	gpio_set_dir_out_masked (MT_RESET | MT_STROBE | MT_DATA | MT_ADDR);
 	gpio_clr_mask (MT_RESET | MT_STROBE | MT_DATA | MT_ADDR);
 
+	// Initialize i2c
+	i2c_init (OLED_I2C, SSD1306_I2C_CLK * 1000);
+	gpio_set_function (PICO_DEFAULT_I2C_SDA_PIN, GPIO_FUNC_I2C);
+	gpio_pull_up (PICO_DEFAULT_I2C_SDA_PIN);
+	gpio_set_function (PICO_DEFAULT_I2C_SCL_PIN, GPIO_FUNC_I2C);
+	gpio_pull_up (PICO_DEFAULT_I2C_SCL_PIN);
+
+	// Initialize the SSD1306
+	ssd1306_init();
+	memset (blank_screen, 0, 128*8);
+	ssd1306_render (blank_screen, &blank_screen_area);
+
+	// We start up in raw mode, show the two-quote and at graphics
+	ssd1306_render (two_quote_buf, &two_quote_area);
+	ssd1306_render (at_buf, &at_area);
+
 	// Initialize the raw matrix row and column lookup tables
 	int i, j;
 	printf ("Initializing lookups…\n");
@@ -48,6 +64,7 @@ int main()
 
 void led_blinking_task (void) {
 	static bool led_state = false;
+	// static uint8_t bit_pattern = 0x55;
 	// static uint32_t pins = MT_RESET;
 	static uint32_t start_ms = 0;
 	const uint32_t interval_ms = 250;
@@ -56,6 +73,8 @@ void led_blinking_task (void) {
 	start_ms += interval_ms;
 	board_led_write (led_state);
 	led_state = 1 - led_state;
+	// bit_pattern ^= 0xff;
+
 	// printf ("%03x\n", pins);
 	// gpio_put_masked (MT_RESET|MT_STROBE|MT_DATA|MT_ADDR, pins);
 	// pins = (pins << 1) & (MT_RESET|MT_STROBE|MT_DATA|MT_ADDR);
@@ -185,6 +204,14 @@ static void process_kbd_report (hid_keyboard_report_t const* report) {
 			!!(presses[(HID_KEY_Z & 0xf0) >> 4] & (1 << (HID_KEY_Z & 0x0f)))
 		) {
 			mapped_mode_active = !mapped_mode_active;
+			ssd1306_render (blank_screen, &blank_screen_area);
+			if (mapped_mode_active) {
+				ssd1306_render (two_at_buf, &two_at_area);
+				ssd1306_render (bracket_buf, &bracket_area);
+			} else {
+				ssd1306_render (two_quote_buf, &two_quote_area);
+				ssd1306_render (at_buf, &at_area);
+			}
 		}
 		return;
 	}

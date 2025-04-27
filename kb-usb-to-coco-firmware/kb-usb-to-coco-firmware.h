@@ -10,6 +10,8 @@
 #include "mt8808.h"
 #include "raw_matrix.h"
 #include "mapped_matrix.h"
+#include "ssd1306_i2c.h"
+#include "sprite.h"
 
 #define MAX_REPORT 4
 
@@ -17,6 +19,15 @@ static struct {
 	uint8_t report_count;
 	tuh_hid_report_info_t report_info[MAX_REPORT];
 } hid_info[CFG_TUH_HID];
+
+static uint8_t blank_screen[128*8];
+static struct render_area blank_screen_area = {
+	.start_col = 0,
+	.end_col = 127,
+	.start_page = 0,
+	.end_page = 7,
+	.buflen = 128 * 8
+};
 
 static bool screen_is_dirty = false;
 

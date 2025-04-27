@@ -28,34 +28,27 @@ set(PICO_BOARD pico CACHE STRING "Board type")
 # Pull in Raspberry Pi Pico SDK (must be before project)
 include(pico_sdk_import.cmake)
 
-project(kb-usb-to-coco-firmware C CXX ASM)
+project(blink C CXX ASM)
 
 # Initialise the Raspberry Pi Pico SDK
 pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(kb-usb-to-coco-firmware
-	kb-usb-to-coco-firmware.c
-	ssd1306_i2c.c
-)
+add_executable(blink
+    blink.c
+    )
 
-pico_set_program_name(kb-usb-to-coco-firmware "kb-usb-to-coco-firmware")
-pico_set_program_version(kb-usb-to-coco-firmware "0.1")
+pico_enable_stdio_usb(blink 1)
 
-# Modify the below lines to enable/disable output over UART/USB
-pico_enable_stdio_uart(kb-usb-to-coco-firmware 1)
-pico_enable_stdio_usb(kb-usb-to-coco-firmware 0)
+# pull in common dependencies
+target_link_libraries(blink pico_stdlib hardware_i2c)
 
-# Add the standard library to the build
-target_link_libraries(kb-usb-to-coco-firmware
-        pico_stdlib tinyusb_host tinyusb_board hardware_i2c)
+if (PICO_CYW43_SUPPORTED)
+    target_link_libraries(blink pico_cyw43_arch_none)
+endif()
 
-# Add the standard include files to the build
-target_include_directories(kb-usb-to-coco-firmware PRIVATE
-  ${CMAKE_CURRENT_LIST_DIR}
-  ${CMAKE_CURRENT_LIST_DIR}/.. # for our common lwipopts or any other standard includes, if required
-)
+# create map/bin/hex file etc.
+pico_add_extra_outputs(blink)
 
-pico_add_extra_outputs(kb-usb-to-coco-firmware)
-
+# add url via pico_set_program_url
